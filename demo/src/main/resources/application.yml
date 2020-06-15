@@ -1,0 +1,9 @@
+netty:
+  port: 8080
+spring:
+  datasource:
+    password: admin
+    url: jdbc:mysql://localhost:3306/nettytest
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    platform: mysql
