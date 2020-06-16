@@ -19,14 +19,15 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 @Component
 @ChannelHandler.Sharable
-public class ServerChannelHandler extends SimpleChannelInboundHandler<Object> {
+public class ServerChannelHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 	
 	private static final Logger logger = LoggerFactory.getLogger(ServerChannelHandler.class);
 	
@@ -37,33 +38,28 @@ public class ServerChannelHandler extends SimpleChannelInboundHandler<Object> {
 	private IPostMapping iPostMapping;
 	
 	@Override
-	protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+	protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
 		if(logger.isInfoEnabled()) {
-			logger.info("Server received {}", msg);
+			logger.info("Server received {}", request);
 		}
-		if(msg instanceof HttpRequest) {
-			HttpRequest request = (HttpRequest) msg;
-			FullHttpResponse response = null;
-			if(request.method().name().equals("GET")) {
-				//will respond to client with the content
-				List<Test> list = iGetMapping.dealGetRequest();
-				String testStr = JSONObject.toJSONString(list, true);
-				ByteBuf content = Unpooled.copiedBuffer(testStr, Charset.defaultCharset());
-				response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
-				//set response header
-				response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json");
-			}
-			else if(request.method().name().equals("POST")) {
-				iPostMapping.dealPost();
-				response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CREATED);
-			}
-			ctx.channel().writeAndFlush(response);
-			ctx.close();
+		if(request.uri() != "/") {
+			ctx.fireChannelRead(request);
 		}
-		else {
-			if(logger.isDebugEnabled()) {
-				logger.debug("this request is not http request");
-			}
+		FullHttpResponse response = null;
+		if(request.method() == HttpMethod.GET) {
+			//will respond to client with the content
+			List<Test> list = iGetMapping.dealGetRequest();
+			String testStr = JSONObject.toJSONString(list, true);
+			ByteBuf content = Unpooled.copiedBuffer(testStr, Charset.defaultCharset());
+			response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
+			//set response header
+			response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json");
 		}
+		else if(request.method() == HttpMethod.POST) {
+			iPostMapping.dealPost();
+			response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CREATED);
+		}
+		ctx.channel().writeAndFlush(response);
+		ctx.close();
 	}
 }
